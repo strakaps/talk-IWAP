@@ -25,9 +25,9 @@ library(tidyverse)
 
 ### Heavy-tailed inter-event times
 
-![](/iimg/vajna-toth-kertesz.png)  
+![](vajna-et-al/iimg/vajna-toth-kertesz.png)  
 <small>
-Vajna, S., Tóth, B., & Kertész, J. (2013). Modelling bursty time series. New Journal of Physics, 15(10), 103023. http://doi.org/10.1088/1367-2630/15/10/103023
+Vajna, S., Tóth, B., & Kertész, J. (2013). _Modelling bursty time series._ New Journal of Physics, 15(10), 103023. http://doi.org/10.1088/1367-2630/15/10/103023
 </small>
 
 
