@@ -1,0 +1,491 @@
+---
+title: "Inference for Bursty Extremes"
+subtitle: "Using R, Shiny and Maths"
+author: "**Peter Straka, UNSW Sydney** </br> 🐦@strakaps 🌐strakaps.github.io"
+date: "2018-06-21 (updated: `r Sys.Date()`)"
+output:
+  xaringan::moon_reader:
+    mathjax: "https://cdn.bootcss.com/mathjax/2.7.1/MathJax.js?config=TeX-MML-AM_HTMLorMML"
+    lib_dir: libs
+    nature:
+      highlightStyle: github
+      highlightLines: true
+      countIncrementalSlides: false
+---
+class: inverse, middle, center
+
+```{r setup, include=FALSE}
+options(htmltools.dir.version = FALSE)
+library(tidyverse)
+```
+
+# Empirical Evidence for Burstiness
+
+---
+
+### Heavy-tailed inter-event times
+
+![](/iimg/vajna-toth-kertesz.png)  
+<small>
+Vajna, S., Tóth, B., & Kertész, J. (2013). Modelling bursty time series. New Journal of Physics, 15(10), 103023. http://doi.org/10.1088/1367-2630/15/10/103023
+</small>
+
+
+---
+
+# Earthquakes, Neurons, Phone calls
+
+![](img/univ-features.png)  
+<small>
+Karsai, M., Kaski, K., Barabási, A. L., & Kertész, J. (2012). _Universal features of correlated bursty behaviour._ Scientific Reports, 2. http://doi.org/10.1038/srep00397
+</small>
+
+---
+
+# Heavy-tailed renewal processes are BURSTY
+
+```{r, include=FALSE, echo=FALSE}
+TT_light <- cumsum(rexp(500, rate = 0.2))
+TT_medium <- cumsum(POT::rgpd(500, shape=1/1.5, scale = 2))
+TT_heavy <- cumsum(POT::rgpd(500, shape=1/0.7))
+x_max <- min(max(TT_light), max(TT_heavy), max(TT_medium))
+p <- tibble(light = TT_light, medium = TT_medium, heavy = TT_heavy) %>%
+  gather(key = type, value = time) %>%
+  ggplot(aes(x=time, y=type)) +
+  geom_point(shape = '+') +
+  scale_x_continuous(limits = c(0,500)) +
+  labs(title="Renewal Processes")
+# ggsave(filename = "../figures/renewal-processes.png", plot = p, width=10, height=5, units = "cm", dpi=300)
+```
+
+![renewal-processes](img/renewal-processes.png)
+
+---
+
+# More Power-Law Inter-Arrival Times
+
+![bursty-exponents](img/bursty-exponents.png)
+
+---
+
+## More Power-Law Inter-Arrival Times
+
+- Resnick and Starica (1995): quiet periods between **transmissions for a networked computer terminal**, $\beta \approx 0.6$
+- Mainardi et al. (2000): waiting times between **trades of bond futures**, $\beta \approx 0.95$
+- Barabási (2005): $\beta \approx 1$ for waiting **time between emails**, and for waiting time for a reply
+- Berhondo et al. (2006): $1 < \beta < 2$, for waiting times between **coronal mass ejections** (solar flares)
+- Brockmann et al. (2006): $\beta \approx 1.05$, waiting times for **paper currency to travel** beyond the limits of a metropolitan area. They also report a power law distribution in the ensuing travel distance
+- Cheng et al. (1995): $\beta \approx 1.6$ in the **waiting time between earthquakes**, and a similar value for waiting time between "starquakes" in neutron stars
+- Lavergnat and Golé (1998):  $\beta \approx 0.68$, **waiting time between large raindrops**
+- Smethurst and Williams (2001): $\beta \approx 1.4$, **waiting times for a doctor appointment**
+- Sabatelli et al. (2002): $\beta \approx 0.4$, for **19th century Irish stock prices**, and $\beta \approx 1.87$ for the modern Japanese Yen currencymarket.
+
+
+---
+
+# Waiting time -- Magnitude pairs
+
+```{r, echo=FALSE}
+waits = c("Server requests", "Earthquakes", "Email sent",
+          "Solar flares", "Time between rest for paper currency",
+          "Time between raindrops", "Time between price jumps")
+mags = c("filesize", "magnitudes", "email replied",
+         "magnitudes", "distance travelled",
+         "raindrop size", "price jumps")
+table_data = data.frame(waits, mags)
+names(table_data) = c("Waiting time", "Magnitude")
+knitr::kable(table_data, format="markdown")
+```
+
+
+---
+class: inverse, middle
+
+# Research Question 🤔
+
+1. What's a good probability model for the **magnitude** and **timing** of bursty extreme events?
+
+2. Can do you do **statistical inference** with such a model?
+
+
+
+---
+
+# Continuous Time Random Exceedances (CTRE)
+
+Ingredients:
+
+- **event magnitudes**: i.i.d. r.v. $J_k \in [x_L, x_R]$ ("support" of $J_k$)
+- **waiting times**:  i.i.d. r.v. $W_k > 0$ times _between_ events
+
+These define the renewal process $\{T_n\}_{n \ge 0}$ where
+
+$$
+T_n = W_1 + \ldots + W_n
+$$
+
+$T_n$ is the time of the $n$-th event with magnitude $J_n$.
+
+This talk considers the *uncoupled* case: $\{W_k\}$ and $\{J_k\}$ are
+independent sequences.
+
+---
+
+# Peaks-Over-Threshold (POT) Method
+
+![exceedances](img/Exceedances.png)
+
+---
+
+# Generalized Pareto Distribution (GPD)
+
+Let $\ell \in [x_L, x_R]$ be a threshold, close to the right end of the support of $J_k$.
+
+Define the **Exceedances** as
+
+$$X(\ell) := J_k - \ell | J_k > \ell.$$
+
+**Theorem (POT, e.g. Leadbetter et al.):**
+
+Asymptotically as $\ell \uparrow x_R$, $X_\ell$ follows a generalized Pareto distribution:
+
+$$
+X_\ell \sim  {\rm GP}(\xi, \bar \sigma), \quad
+1 - H(z) = \left(1+\frac{\xi z}{\bar \sigma}\right)^{-1/\xi}
+$$
+
+Where
+
+* $H(z)$ is the CDF of $X_\ell$
+* $\bar \sigma = \sigma + \xi(\ell - \mu)$, and $(\xi, \sigma, \mu)$ are
+  parameters of a GEV distribution
+
+---
+
+# Peaks-Over-Threshold (POT)
+
+* Order the magnitudes $\{J_{(1)} > J_{(2)} > \ldots > J_{(n)}\}$
+
+For thresholds $\ell$ in magnitudes:
+
+* extract exceedances $X(\ell)$
+* fit ${\rm GP}(\xi,\sigma)$ distribution to the $X(\ell)$
+
+Then plot parameters estimates $\hat \xi, \hat \sigma$ against $k$.
+
+Bias-variance trade-off:
+
+Small k: few data (high variance) but many geometric summands, hence asymptotically
+close to M-L distribution (low bias)
+
+High k: many data (low variance) but few geometric summands, hence far away from
+GP distribution (high bias)
+
+**Example:** Solar Flares data.
+
+[CTRE Shiny App](https://strakaps.shinyapps.io/ctre-app/)
+
+---
+
+<iframe src="https://strakaps.shinyapps.io/ctre-app/" style="border: none; width: 1000px; height: 600px"> </iframe>
+
+---
+
+# Inference on Exceedances
+
+* Threshold $\ell = 23000$ seems to be a reasonable choice
+
+* Exceedances of this threshold have a GP distributions with parameters $\xi \approx 0.14$ and $\sigma \approx 43000$
+
+```{r GP-plot, eval=FALSE, out.height=3, echo=FALSE}
+xx <- exp(seq(from = 1, to = 12, length.out = 50))
+yy <- POT::pgpd(q = xx, loc = 0, scale = 43000, shape = 0.14, lower.tail = FALSE)
+tibble(x=xx, y=yy) %>%
+  ggplot(aes(x=xx, y=yy)) + geom_line()
+ggsave(filename = "../figures/GPfit.png", height = 5, units = "cm")
+```
+
+![GPfit](img/GPfit.png)
+
+---
+
+# Threshold Exceedance Time
+
+First magnitude above a threshold $\ell$ has index
+
+$$\tau(\ell) = \min\{k: J_k > \ell\}$$
+
+Because the $J_k$ are i.i.d.,
+
+$$\tau(\ell) \sim {\rm Geom}(p_\ell), \quad \text{ where } \quad p_\ell = {\rm Pr}(J_k \ge \ell)$$
+
+**Threshold Exceedance Time:**
+
+$$T(\ell) = \sum_{k=1}^{\tau(\ell)} W_k$$
+
+Geometric sums converge to what? 🙋
+
+---
+
+# Scaling Limit of Exceedance Time $T(\ell)$
+
+**Theorem:**
+
+* Let $[x_L, x_R]$ be the support of the $J_k$.
+* Suppose that the $W_k$ are regularly varying<sup>1</sup> with parameter
+  $0 < \beta < 1$
+* Let $\ell \in [x_L, x_R]$ be a threshold
+* Write $p_\ell = {\rm Pr}(J_k > \ell)$.
+
+Then for some $\sigma > 0$,
+
+$$p_\ell^{1/\beta} T(\ell) \stackrel{d}{\to} {\rm ML}(\beta, \sigma), \quad \ell \uparrow x_R$$
+
+.footnote[
+[1] This means $\mathbf P(W_k > t) = L(t) t^{-\beta}$ for some slowly varying function $L(t)$ and $\beta \in (0,1)$  .[2] Gnedenko 1972
+]
+
+**Proof:**
+
+Due to their tail property, the $W_k$ lie in the domain of geometric attraction
+of the Mittag-Leffler distribution<sup>2</sup>.
+
+---
+class: middle
+
+## 🤓 Historical Remark
+
+Researchers in "Shock Processes" (1980s) have seemingly tried to derive this result but didn't get past Laplace transforms.
+
+This is because Gnedenko's (1972) reresults weren't available to them!
+
+It took the end of the Cold War and the invention of the internet to
+put the two things together.
+
+---
+
+
+# Mittag-Leffler Function
+
+**Definition:**
+
+$$E_\beta(z) = \sum_{k=0}^\infty \frac{z^k}{\Gamma(1+\beta k)},
+\quad z \in \mathbb R, \quad 0 < \beta \le 1$$
+
+$E_\beta(z)$ nests the exponential function:
+$$E_1(z) = e^z$$
+
+Asymptotics for $z \to \infty$:
+$$E_\beta(-z^\beta) \sim z^{-\beta}$$
+
+Asymptotics for $z \downarrow 0$:
+$$E_\beta(-z^\beta) \sim \exp(-z^\beta)$$
+
+
+---
+
+# Mittag-Leffler Function
+
+![ML-function](img/ML-function.png)
+
+---
+
+# Mittag-Leffler-1 Distribution
+
+**Definition:**
+
+A r.v. $T_\beta$ is **Mittag-Leffler-1 distributed**<sup>☢️</sup>
+with tail parameter $\beta \in (0,1]$ if
+
+$$\mathbf P(T > t) = E_\beta(-t^\beta), \quad t > 0.$$
+
+* Laplace transform: $\frac{1}{1+s^\beta}$
+* The ML-1 distribution is **geometrically stable**
+* heavy-tailed (infinite mean), but:
+* As $\beta \uparrow 1$, $T \stackrel{d}{\to} {\rm Exp(1)}$
+* Introduce the scale parameter $\sigma > 0$ via
+  $\sigma T \sim \rm{ML}(\beta,\sigma)$
+
+.footnote[
+☢️ There is also a Mittag-Leffler-2 distribution; see
+[R package MittagLeffleR](strakaps.github.io/MittagLeffleR/).
+]
+
+---
+
+## 🧠 Consequence of Scaling limit for Exceedance Time
+
+Recall that we have derived
+
+$$p_\ell^{1/\beta} T(\ell) \stackrel{d}{\to} {\rm ML}(\beta, \sigma_0), \quad \ell \uparrow x_R$$
+
+for the threshold exceedance time $T(\ell)$.
+
+**Consequence:**
+
+For large thresholds $\ell$, we may approximate
+
+$$T(\ell) \approx {\rm ML}(\beta, \sigma_0 p_\ell^{-1/\beta}).$$
+
+As threshold $\ell$ increases, $\ell \uparrow x_R$, the threshold exceedance
+times are Mittag-Leffler distributed, with
+
+a **constant** tail parameter $\beta$ and
+
+a **nonlinearly increasing** scale parameter
+$\sigma = \sigma_0 p_\ell^{-1/\beta}$
+
+---
+
+# Two-stage estimator
+
+**"Algorithm":**
+
+1. Order the magnitudes $\{J_{(1)} > J_{(2)} > \ldots > J_{(n)}\}$
+
+2. For $k$ in $\{5, 6, \ldots, 200\}$:
+
+    a. Extract the $k-1$ exceedance times for threshold
+    $\ell = J_{(k)}$
+
+    b. Fit an ML1 distribution to the exceedances, to get the
+    estimates $\hat \beta_k, \hat\sigma_k$
+
+3. Plot $k$ vs. $\beta_k$ and read off an estimate for $\beta$
+
+4. Plot $k$ vs. $k^{1/\hat\beta} \hat \sigma_k$,
+  and read off estimate for $\sigma_0$
+
+---
+
+# Mittag-Leffler estimation via log-moments
+
+
+Let $T \sim ML(\beta, \sigma)$.
+
+All moments are infinite if $\beta \in (0,1)$.
+
+But moments of logarithmic transform are finite:
+
+$$\mu_{\log T} = \mathbf E[\log T] = \log(\sigma) - \gamma, \quad \sigma_{\log T} = {\rm Var}[\log T] = \frac{\pi^2}{6} \left( \frac{2}{\beta^2} - 1 \right)$$
+
+
+Find parameters $\hat \beta$ and $\hat \sigma_T$ for which the first two centered moments match their _empirical_ counterparts
+$$\hat \mu_{\log T} = \frac{1}{n} \sum_{j=1}^n \log(T_j), \quad
+ \hat \sigma_{\log T} = \frac{1}{n} \sum_{j=1}^n (\log(T_j) - \hat \mu_{\log T})^2$$
+
+(Cahoy et al '10)
+
+
+---
+
+<iframe src="https://strakaps.shinyapps.io/ctre-app/" style="border: none; width: 1000px; height: 600px"> </iframe>
+
+
+---
+
+# Example
+
+For the Solar Flare Data:
+
+* $\beta = 0.85$ or $\beta = 0.9$ seems to be a reasonable choice.
+  Theh null hypothesis that inter-arrival times are exponential,
+  $H_0: \beta = 1$ is rejected.
+
+* $\sigma = 2 \times 10^7$ (seconds) seems to be a reasonable choice.
+
+Then for a threshold as high as the $k$-th largest magnitude,
+the inter-arrival time of events follows the distribution
+
+$$
+T\left(X_{(k)}\right) \sim {\rm ML}\left(0.85, \frac{2 \times 10^7 {\rm sec}}{k^{-1/0.85}}\right)
+$$
+
+---
+
+## Compare to Exponential
+
+```{r, eval = FALSE, echo=FALSE}
+library(MittagLeffleR)
+df <- tibble(
+  x = seq(0.01, 7, length.out = 100),
+  y_exp =  dexp(x),
+  y_ML = dml(x, tail = 0.85)
+)
+names(df) <- c("x", "beta=1", "beta=0.85")
+df %>%
+  gather(type, prob, -x) %>%
+  ggplot(aes(x = x, y = prob, col = type)) + geom_line() +
+  scale_y_continuous(trans = "log10") +
+  scale_x_continuous(trans="log10")
+ggsave(filename = "../figures/MLvsEXP.png", units = "cm", height = 8)
+```
+
+![MLvsEXP](img/MLvsEXP.png)
+
+
+---
+
+# Conclusion
+
+- Peaks-Over-Threshold can be generalized to heavy-tailed inter-arrival times
+
+- The Exponential distribution is a special case of the Mittag-Leffler distribution
+
+- Ignoring bursty behaviour underestimates the probabilities of very
+short and very long waiting times
+
+
+---
+
+# Obvious Extension
+
+There are even more "weakly" bursty datasets: $1 < \beta < 2$.
+
+The Problem:
+
+## Skewed geometric stable distributions
+
+* no algorithms for their densities
+
+* no good estimators
+
+---
+class: inverse, middle
+
+
+# Thank you for lending me your 👂
+
+
+## References:
+
+1. "Peaks Over Threshold for Bursty Time Series". Katharina Hees, Smarak Nayak & Peter Straka. arXiv:1802.05218
+
+2. R package **CTRE**. Katharina Hees & Peter Straka.  [strakaps.github.io/CTRE](https://strakaps.github.io/CTRE/)
+
+---
+
+
+## In case the app doesn't work
+
+![GP-shape](img/GPshape.png)
+
+
+---
+
+## In case the app doesn't work
+
+![GP-scale](img/GPscale.png)
+
+
+---
+
+## In case the app doesn't work
+
+![MLtail](img/MLtail.png)
+
+---
+
+## In case the app doesn't work
+
+![MLtail](cale.png)
