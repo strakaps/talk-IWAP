@@ -482,10 +482,10 @@ class: inverse, middle
 
 ## In case the app doesn't work
 
-![MLtail](img/MLtail.png)
+![MLtail]-(img/MLtail.png)
 
 ---
 
 ## In case the app doesn't work
 
-![MLtail](cale.png)
+![MLtail]-(cale.png)
